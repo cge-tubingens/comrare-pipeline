@@ -17,3 +17,5 @@ sample_QC = SampleQC(
 )
 
 sample_QC.run_ld_prune(ld_region_path=REGION_PATH)
+
+sample_QC.run_heterozygosity_rate()
