@@ -134,3 +134,44 @@ class SampleQC:
         }
 
         return out_dict
+    
+    def run_heterozygosity_rate(self):
+
+        """
+        Function to identify individuals with elevated missing data rates or outlying heterozygosity rate
+        """
+
+        input_path = self.input_path
+        input_name = self.input_name
+        output_path= self.output_path
+        output_name= self.output_name
+        result_path= self.results_dir
+
+        step = "heterozygosity_rate"
+
+        # 
+        plink_cmd1 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --missing --out {os.path.join(result_path, output_name)}"
+
+        # 
+        plink_cmd2 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --het --autosome --extract {os.path.join(result_path, output_name+'_1.prune.in')} --out {os.path.join(result_path, output_name)}"
+
+        print('command_one', plink_cmd1)
+        print('command_two', plink_cmd2)
+
+        cmds = [plink_cmd1, plink_cmd2]
+        for cmd in cmds:
+            shell_do(cmd, log=True)
+
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': output_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
