@@ -5,7 +5,7 @@ Python module to perform sample quality control
 import os
 import json
 
-from Helpers import shell_do
+from classes.Helpers import shell_do
 
 class SampleQC:
 
@@ -39,9 +39,12 @@ class SampleQC:
         self.output_name= output_name
 
         with open(config_path, 'r') as file:
-            self.config_dict = json.loads(file)
+            self.config_dict = json.load(file)
 
-    def run_ld_prune(self, ld_region_path:str):
+        self.results_dir = os.path.join(output_path, 'sample_qc_results')
+        os.mkdir(self.results_dir)
+
+    def run_ld_prune(self, ld_region_path:str)->dict:
 
         """
         Prunes samples based on Linkage Disequilibrium
@@ -58,6 +61,7 @@ class SampleQC:
 
         input_path = self.input_path
         input_name = self.input_name
+        result_path= self.results_dir
         output_path= self.output_path
         output_name= self.output_name
 
@@ -101,17 +105,14 @@ class SampleQC:
 
         step = "ld_prune"
 
-        # temp file
-        ld_temp = '{}_ld_temp'.format(output_path)
-
         # generates prune.in and prune.out
-        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {ld_region_path} --range --indep-pairwise 50 5 0.2 --out {os.path.join(output_path, output_name+'_1')}"
+        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {ld_region_path} --range --indep-pairwise 50 5 0.2 --out {os.path.join(result_path, output_name+'_1')}"
 
         # prune and creates a filtered binary file
-        plink_cmd2 = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --extract {os.path.join(output_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(output_path, output_name+'_1')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --extract {os.path.join(result_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(output_path, output_name+'_1')}"
 
         print('command_one', plink_cmd1)
-        print('command_two', plink_cmd1)
+        print('command_two', plink_cmd2)
 
         cmds = [plink_cmd1, plink_cmd2]
         for cmd in cmds:
