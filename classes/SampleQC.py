@@ -5,7 +5,10 @@ Python module to perform sample quality control
 import os
 import json
 
-from classes.Helpers import shell_do
+import pandas as pd
+import numpy as np
+
+from classes.Helpers import shell_do, load_imiss_file, load_het_file
 
 class SampleQC:
 
@@ -42,7 +45,8 @@ class SampleQC:
             self.config_dict = json.load(file)
 
         self.results_dir = os.path.join(output_path, 'sample_qc_results')
-        os.mkdir(self.results_dir)
+        if not os.path.exists(self.results_dir):
+            os.mkdir(self.results_dir)
 
     def run_ld_prune(self, ld_region_path:str)->dict:
 
@@ -141,8 +145,6 @@ class SampleQC:
         Function to identify individuals with elevated missing data rates or outlying heterozygosity rate
         """
 
-        input_path = self.input_path
-        input_name = self.input_name
         output_path= self.output_path
         output_name= self.output_name
         result_path= self.results_dir
@@ -162,10 +164,42 @@ class SampleQC:
         for cmd in cmds:
             shell_do(cmd, log=True)
 
+        df_het = load_het_file(
+            het_path=os.path.join(result_path, output_name+'.het')
+        )
+        df_imiss = load_imiss_file(
+            imiss_path=os.path.join(result_path, output_name+'.imiss')
+        )
+
+        # Compute the lower 2 standard deviation bound
+        meanHet_lower = df_het['meanHet'].mean() - 2*df_het['meanHet'].std()
+
+        # Compute the upper 2 standard deviation bound
+        meanHet_upper = df_het['meanHet'].mean() + 2*df_het['meanHet'].std()
+
+        mask = ((df_imiss['F_MISS']>=0.04) | (df_het['meanHet'] < meanHet_lower) | (df_het['meanHet'] > meanHet_upper))
+
+        df = df_imiss[mask].reset_index(drop=True)
+        df = df.iloc[:,0:2].copy()
+
+        del df_het
+        del df_imiss
+
+        path_df = os.path.join(result_path, output_name+'.fail-imisshet-qc.txt')
+
+        df.to_csv(path_or_buf=path_df, sep='\t', index=False, header=False)
+
+        del df
+
+        # Creation of cleaned binary file
+        plink_cmd3 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --remove {path_df} --make-bed --out {os.path.join(result_path, output_name+'_2')}"
+
+        shell_do(plink_cmd3, log=True)
+
         process_complete = True
 
         outfiles_dict = {
-            'plink_out': output_path
+            'plink_out': result_path
         }
 
         out_dict = {
