@@ -139,7 +139,7 @@ class SampleQC:
 
         return out_dict
     
-    def run_heterozygosity_rate(self):
+    def run_heterozygosity_rate(self)->dict:
 
         """
         Function to identify individuals with elevated missing data rates or outlying heterozygosity rate
@@ -195,6 +195,78 @@ class SampleQC:
         plink_cmd3 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --remove {path_df} --make-bed --out {os.path.join(result_path, output_name+'_2')}"
 
         shell_do(plink_cmd3, log=True)
+
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': result_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
+
+    def run_sex_check(self)->dict:
+
+        """
+        Function to identify individuals with discordant sex information
+        """
+
+        output_path= self.output_path
+        output_name= self.output_name
+        result_path= self.results_dir
+
+        sex_check = self.config_dict['sex_check']
+
+        # check type sex_check
+        if not isinstance(sex_check, list):
+            raise TypeError("sex_check should be a list")
+        if len(sex_check)!=2:
+            raise ValueError("sex_check must be a list of length 2")
+        
+        for value in sex_check:
+            if not isinstance(value, float):
+                raise TypeError("sex_check values should be float")
+            if 0 > value or value > 1:
+                raise ValueError("sex_check values must be between 0 and 1")
+        
+        if sum(sex_check) != 1:
+            raise ValueError("sex_check values should add to 1")
+        
+        step = "sex_check"
+
+        # 
+        plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'_2')} --check-sex {sex_check[0]} {sex_check[1]} --keep-allele-order --extract {os.path.join(result_path, output_name+'_1.prune.in')} --out {os.path.join(result_path, output_name)}"
+
+        shell_do(plink_cmd1, log=True)
+
+        df = pd.read_csv(
+            os.path.join(result_path, output_name+'.sexcheck'),
+            sep='\s+'
+        )
+
+        df_probs = df[df['STATUS']=='PROBLEM'].reset_index(drop=True)
+        df_probs.to_csv(
+            os.path.join(result_path, output_name+'.sexprobs'),
+            index=False,
+            sep='\t'
+        )
+
+        df_probs = df_probs.iloc[:,0:2].copy()
+        df_probs.to_csv(
+            os.path.join(result_path, output_name+'.fail-sexcheck-qc.txt'),
+            index=False,
+            header=False,
+            sep=' '
+        )
+
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'_2')} --keep-allele-order --remove {os.path.join(result_path, output_name+'.fail-sexcheck-qc.txt')} --make-bed --out {os.path.join(result_path, output_name+'_3')}"
+
+        shell_do(plink_cmd2, log=True)
 
         process_complete = True
 
