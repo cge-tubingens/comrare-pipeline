@@ -22,15 +22,4 @@ sample_QC.run_heterozygosity_rate()
 
 sample_QC.run_sex_check()
 
-df_dup, df_imiss, df_1, df_2, removed = sample_QC.run_relatedness_prune()
-
-#df_dup
-#
-#df_imiss
-#
-#df_1
-#
-#df_2
-
-removed
-
+sample_QC.run_relatedness_prune()
