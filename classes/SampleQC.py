@@ -216,7 +216,6 @@ class SampleQC:
         Function to identify individuals with discordant sex information
         """
 
-        output_path= self.output_path
         output_name= self.output_name
         result_path= self.results_dir
 
@@ -281,3 +280,96 @@ class SampleQC:
         }
 
         return out_dict
+
+    def run_relatedness_prune(self)->dict:
+
+        """
+        Function to identify duplicated or related individuals
+        """
+
+        result_path= self.results_dir
+        output_path= self.output_path
+        output_name= self.output_name
+
+        step = "duplicate_relative_prune"
+
+        to_remove = pd.DataFrame(columns=['FID', 'IID'])
+
+        # Run genome
+        plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'_3')} --keep-allele-order --extract {os.path.join(result_path, output_name+'_1.prune.in')} --genome --out {os.path.join(output_path, output_name)}"
+
+        # Generate new .imiss file
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'_3')} --keep-allele-order --missing --out {os.path.join(output_path, output_name)}"
+
+        cmds = [plink_cmd1, plink_cmd2]
+        for cmd in cmds:
+            shell_do(cmd, log=True)
+
+        # Load .imiss file
+        df_imiss = pd.read_csv(
+            os.path.join(output_path, output_name+'.imiss'),
+            sep='\s+'
+        )
+        # Load .genome file
+        df_genome = pd.read_csv(
+            os.path.join(output_path, output_name+'.genome'),
+            sep='\s+'
+        )
+
+        # Isolate duplicates or related samples
+        df_dup = df_genome[df_genome['PI_HAT']>0.185].reset_index(drop=True)
+
+        df_1 = pd.merge(
+            df_dup[['FID1', 'IID1']], 
+            df_imiss[['FID', 'IID', 'F_MISS']], 
+            left_on=['FID1', 'IID1'],
+            right_on=['FID', 'IID']
+        ).drop(columns=['FID', 'IID'], inplace=False)
+
+        df_2 = pd.merge(
+            df_dup[['FID2', 'IID2']], 
+            df_imiss[['FID', 'IID', 'F_MISS']], 
+            left_on=['FID2', 'IID2'],
+            right_on=['FID', 'IID']
+        ).drop(columns=['FID', 'IID'], inplace=False)
+
+        for k in range(len(df_dup)):
+
+            if df_1.iloc[k,2]>df_2.iloc[k,2]:
+                print('sample', df_1.iloc[k,0:2].to_list())
+                to_remove.loc[k] = df_1.iloc[k,0:2].to_list()
+            elif df_1.iloc[k,2]<df_2.iloc[k,2]:
+                to_remove.loc[k] = df_2.iloc[k,0:2].to_list()
+            else:
+                to_remove.loc[k] = df_1.iloc[k,0:2].to_list()
+
+        to_remove = to_remove.drop_duplicates(keep='last')
+        to_remove.to_csv(
+            os.path.join(result_path, output_name+'.fail-IBD1-qc.txt'),
+            index=False,
+            header=False
+        )
+
+        # Create cleaned binary files
+        plink_cmd3 = f"plink --bfile {os.path.join(result_path, output_name+'_3')} --keep-allele-order --remove {os.path.join(result_path, output_name+'.fail-IBD1-qc.txt')} --make-bed --out ${os.path.join(result_path, output_name+'_4')}"
+
+        shell_do(plink_cmd3, log=True)
+
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': result_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
+
+
+
+
+
