@@ -347,11 +347,12 @@ class SampleQC:
         to_remove.to_csv(
             os.path.join(result_path, output_name+'.fail-IBD1-qc.txt'),
             index=False,
-            header=False
+            header=False,
+            sep=" "
         )
 
         # Create cleaned binary files
-        plink_cmd3 = f"plink --bfile {os.path.join(result_path, output_name+'_3')} --keep-allele-order --remove {os.path.join(result_path, output_name+'.fail-IBD1-qc.txt')} --make-bed --out ${os.path.join(result_path, output_name+'_4')}"
+        plink_cmd3 = f"plink --bfile {os.path.join(result_path, output_name+'_3')} --keep-allele-order --remove {os.path.join(result_path, output_name+'.fail-IBD1-qc.txt')} --make-bed --out {os.path.join(result_path, output_name+'_4')}"
 
         shell_do(plink_cmd3, log=True)
 
