@@ -164,11 +164,13 @@ class SampleQC:
         for cmd in cmds:
             shell_do(cmd, log=True)
 
-        df_het = load_het_file(
-            het_path=os.path.join(result_path, output_name+'.het')
+        df_het = pd.read_csv(
+            os.path.join(result_path, output_name+'.het'),
+            sep="\s+"
         )
-        df_imiss = load_imiss_file(
-            imiss_path=os.path.join(result_path, output_name+'.imiss')
+        df_imiss = pd.read_csv(
+            os.path.join(result_path, output_name+'.imiss'),
+            sep="\s+"
         )
 
         # Compute the lower 2 standard deviation bound
