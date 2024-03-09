@@ -8,7 +8,7 @@ import json
 import pandas as pd
 import numpy as np
 
-from classes.Helpers import shell_do, load_imiss_file, load_het_file
+from classes.Helpers import shell_do
 
 class SampleQC:
 
@@ -173,6 +173,9 @@ class SampleQC:
             sep="\s+"
         )
 
+        # Compute Het mean
+        df_het['meanHet'] = (df_het['N(NM)']-df_het['O(HOM)'])/df_het['N(NM)']
+    
         # Compute the lower 2 standard deviation bound
         meanHet_lower = df_het['meanHet'].mean() - 2*df_het['meanHet'].std()
 
@@ -372,7 +375,72 @@ class SampleQC:
 
         return out_dict
 
+    def delete_failing_QC(self)->None:
 
+        """
+        Function to remove samples that failed quality control
+        """
 
+        input_path = self.input_path
+        input_name = self.input_name
+        result_path= self.results_dir
+        output_path= self.output_path
+        output_name= self.output_name
 
+        step = "delete_sample_failed_QC"
+
+        df_sex = pd.read_csv(
+            os.path.join(result_path, output_name+'.fail-sexcheck-qc.txt'),
+            sep=' ',
+            index_col=False,
+            header=None
+        )
+
+        df_imiss = pd.read_csv(
+            os.path.join(result_path, output_name+'.fail-imisshet-qc.txt'),
+            sep=' ',
+            index_col=False,
+            header=None
+        )
+
+        df_ibd1 = pd.read_csv(
+            os.path.join(result_path, output_name+'.fail-IBD1-qc.txt'),
+            sep=' ',
+            index_col=False,
+            header=None
+        )
+
+        # concatenate all failings samples
+        df = pd.concat([df_sex, df_imiss, df_ibd1], axis=0)
+
+        # sort values by the first column
+        df.sort_values(by=df.columns[0], inplace=True)
+
+        # drop duplicates
+        df = df.drop_duplicates(keep='first')
+
+        df.to_csv(
+            os.path.join(result_path, output_name+'.fail-qc_1-inds.txt'),
+            sep=' ',
+            header=False,
+            index=False
+        )
+
+        plink_cmd = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --remove {os.path.join(result_path, output_name+'.fail-qc_1-inds.txt')} --make-bed --out {os.path.join(result_path, output_name+'.pre_ind_clean')}"
+
+        shell_do(plink_cmd, log=True)
+
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': result_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
 
