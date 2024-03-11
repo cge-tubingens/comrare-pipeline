@@ -454,7 +454,7 @@ class SampleQC:
         """
         Function to identify subject with divergent ancestry
         """
-        
+
         result_path= self.results_dir
         output_name= self.output_name
         dependables_path = self.dependables
@@ -532,4 +532,6 @@ class SampleQC:
         return out_dict
     
 
+    def run_pca_analysis(self)->dict:
 
+        return None
