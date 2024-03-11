@@ -12,11 +12,11 @@ from classes.Helpers import shell_do
 
 class SampleQC:
 
-    def __init__(self, input_path:str, input_name:str, output_path:str, output_name:str, config_path:str) -> None:
+    def __init__(self, input_path:str, input_name:str, output_path:str, output_name:str, config_path:str, dependables_path:str) -> None:
 
         # check if paths are set
-        if input_path is None or output_path is None:
-            raise ValueError("Both input_path and output_path must be set upon initialization.")
+        if input_path is None or output_path is None or dependables_path is None:
+            raise ValueError("values for input_path, output_path and dependables_path must be set upon initialization.")
 
         # Check path validity
         bed_path = os.path.join(input_path, input_name + '.bed')
@@ -29,6 +29,8 @@ class SampleQC:
 
         if not os.path.exists(input_path) or not os.path.exists(output_path):
             raise FileNotFoundError("input_path or output_path is not a valid path")
+        if not os.path.exists(dependables_path):
+            raise FileNotFoundError("dependables_oath is not a valid path")
         if not bed_check:
             raise FileNotFoundError(".bed file not found")
         if not fam_check:
@@ -40,6 +42,7 @@ class SampleQC:
         self.output_path= output_path
         self.input_name = input_name
         self.output_name= output_name
+        self.dependables = dependables_path
 
         with open(config_path, 'r') as file:
             self.config_dict = json.load(file)
@@ -48,12 +51,13 @@ class SampleQC:
         if not os.path.exists(self.results_dir):
             os.mkdir(self.results_dir)
 
-    def run_ld_prune(self, ld_region_path:str)->dict:
+    def run_ld_prune(self, ld_region_file:str)->dict:
 
         """
         Prunes samples based on Linkage Disequilibrium
 
         Parameters:
+        - 
 
         Returns:
         - dict: A structured dictionary containing:
@@ -63,11 +67,12 @@ class SampleQC:
             * 'output': Dictionary containing paths to the generated output files.
         """
 
-        input_path = self.input_path
-        input_name = self.input_name
-        result_path= self.results_dir
-        output_path= self.output_path
-        output_name= self.output_name
+        input_path       = self.input_path
+        input_name       = self.input_name
+        result_path      = self.results_dir
+        output_path      = self.output_path
+        output_name      = self.output_name
+        dependables_path = self.dependables
 
         maf = self.config_dict['maf']
         geno= self.config_dict['geno']
@@ -106,11 +111,15 @@ class SampleQC:
         # Check if hwe is in range
         if hwe < 0.00000001 or hwe > 0.001:
             raise ValueError("hwe should be between 0.00000001 and 0.001")
+        
+        high_ld_regions_file = os.path.join(dependables_path, ld_region_file)
+        if not os.path.exists(high_ld_regions_file):
+            raise FileNotFoundError("File with high LD region was not found")
 
         step = "ld_prune"
 
         # generates prune.in and prune.out
-        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {ld_region_path} --range --indep-pairwise 50 5 0.2 --out {os.path.join(result_path, output_name+'_1')}"
+        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {high_ld_regions_file} --range --indep-pairwise 50 5 0.2 --out {os.path.join(result_path, output_name+'_1')}"
 
         # prune and creates a filtered binary file
         plink_cmd2 = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --extract {os.path.join(result_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(output_path, output_name+'_1')}"
@@ -156,9 +165,6 @@ class SampleQC:
 
         # 
         plink_cmd2 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --het --autosome --extract {os.path.join(result_path, output_name+'_1.prune.in')} --out {os.path.join(result_path, output_name)}"
-
-        print('command_one', plink_cmd1)
-        print('command_two', plink_cmd2)
 
         cmds = [plink_cmd1, plink_cmd2]
         for cmd in cmds:
@@ -384,7 +390,6 @@ class SampleQC:
         input_path = self.input_path
         input_name = self.input_name
         result_path= self.results_dir
-        output_path= self.output_path
         output_name= self.output_name
 
         step = "delete_sample_failed_QC"
@@ -443,4 +448,88 @@ class SampleQC:
         }
 
         return out_dict
+
+    def divergent_ancestry_step_one(self, hapmap3r2_no_at_cg_snps_file:str, hapmap3r2_founders_name:str)->dict:
+
+        """
+        Function to identify subject with divergent ancestry
+        """
+        
+        result_path= self.results_dir
+        output_name= self.output_name
+        dependables_path = self.dependables
+
+        maf = self.config_dict['maf']
+
+        hapmap3r2_txt = os.path.join(dependables_path, hapmap3r2_no_at_cg_snps_file)
+        hapmap_bed = os.path.join(dependables_path, hapmap3r2_founders_name+'.bed')
+        hapmap_bim = os.path.join(dependables_path, hapmap3r2_founders_name+'.bim')
+        hapmap_fam = os.path.join(dependables_path, hapmap3r2_founders_name+'.fam')
+
+        if not os.path.exists(hapmap3r2_txt):
+            raise FileNotFoundError("hapmap3r2_no_at_cg_snps_file not found")
+        
+        # check if hapmap3r2 founders bed, bim, fam files exist
+        if not os.path.exists(hapmap_bed):
+            raise FileNotFoundError("hapmap_founders.bed file not found")
+        if not os.path.exists(hapmap_bim):
+            raise FileNotFoundError("hapmap_founders.bim file not found")
+        if not os.path.exists(hapmap_fam):
+            raise FileNotFoundError("hapmap_founders.fam file not found")
+
+        step = "identify_samples_divergent_ancestry"
+
+        plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean')} --autosome --keep-allele-order --maf {maf} --extract {hapmap3r2_txt} --make-bed --out {os.path.join(result_path, output_name+'.hapmap-snps')}"
+
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.hapmap-snps')} --autosome --keep-allele-order --maf {maf} --bmerge {hapmap_bed} {hapmap_bim} {hapmap_fam} --extract {os.path.join(result_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(result_path, output_name+'.hapmap3r2.pruned')}"
+
+        cmds = [plink_cmd1, plink_cmd2]
+        for cmd in cmds:
+            shell_do(cmd, log=True)
+
+        missnp_file = os.path.join(result_path, output_name+'.hapmap3r2.pruned-merge.missnp')
+
+        if os.path.exists(missnp_file):
+
+            plink_cmd3 = f"plink --bfile {os.path.join(result_path, output_name+'.hapmap-snps')} --autosome --keep-allele-order --maf {maf} --flip {missnp_file} --make-bed --out {os.path.join(result_path, output_name+'.hapmap-snps1')}"
+
+            plink_cmd4 = f"plink --bfile {os.path.join(result_path, output_name+'.hapmap-snps1')} --autosome --keep-allele-order --maf {maf} --bmerge {hapmap_bed} {hapmap_bim} {hapmap_fam} --extract {os.path.join(result_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(result_path, output_name+'.hapmap3r2.pruned')}"
+
+            cmds = [plink_cmd3, plink_cmd4]
+            for cmd in cmds:
+                shell_do(cmd, log=True)
+
+            bash_cmd1 = f"cp {os.path.join(result_path, output_name+'.hapmap3r2.pruned.bim')} {os.path.join(result_path, output_name+'.hapmap3r2.pruned.pedsnp')}"
+
+            bash_cmd2 = f"cp {os.path.join(result_path, output_name+'.hapmap3r2.pruned.fam')} {os.path.join(result_path, output_name+'.hapmap3r2.pruned.pedind')}"
+
+            bashes = [bash_cmd1, bash_cmd2]
+            for cmd in bashes:
+                os.system(cmd)
+
+        else:
+
+            bash_cmd1 = f"cp {os.path.join(result_path, output_name+'.hapmap3r2.pruned.bim')} {os.path.join(result_path, output_name+'.hapmap3r2.pruned.pedsnp')}"
+
+            bash_cmd2 = f"cp {os.path.join(result_path, output_name+'.hapmap3r2.pruned.fam')} {os.path.join(result_path, output_name+'.hapmap3r2.pruned.pedind')}"
+
+            bashes = [bash_cmd1, bash_cmd2]
+            for cmd in bashes:
+                os.system(cmd)
+
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': result_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
+    
+
 
