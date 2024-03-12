@@ -47,14 +47,20 @@ class VariantQC:
         with open(config_path, 'r') as file:
             self.config_dict = json.load(file)
 
-        self.results_dir = os.path.join(output_path, 'sample_qc_results')
+        self.results_dir = os.path.join(output_path, 'variant_qc_results')
         if not os.path.exists(self.results_dir):
             os.mkdir(self.results_dir)
 
     def missing_data_rate(self)->dict:
 
         """
-        Function to identify all markers with an excessive missing rate
+        Function to identify all markers with an excessive missing rate.
+
+        Returns:
+        - dict: A structured dictionary containing:
+            * 'pass': Boolean indicating the successful completion of the process.
+            * 'step': The label for this procedure ('ld_prune').
+            * 'output': Dictionary containing paths to the generated output files.
         """
 
         result_path      = self.results_dir
@@ -104,6 +110,7 @@ class VariantQC:
             for snp in fail_snp:
                 file.write('%s\n' % snp)
 
+        # report
         process_complete = True
 
         outfiles_dict = {
@@ -121,16 +128,24 @@ class VariantQC:
     def different_genotype_call_rate(self)->dict:
 
         """
-        Funtion to identify test markers for different genotype call rates between cases and controls
+        Funtion to identify test markers for different genotype call rates between cases and controls.
+
+        Returns:
+        - dict: A structured dictionary containing:
+            * 'pass': Boolean indicating the successful completion of the process.
+            * 'step': The label for this procedure ('ld_prune').
+            * 'output': Dictionary containing paths to the generated output files.
         """
 
-        result_path      = self.results_dir
-        output_name      = self.output_name
+        result_path = self.results_dir
+        output_name = self.output_name
 
         step = 'different_genotype_case_control'
 
+        # 
         plink_cmd = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --test-missing --out {os.path.join(result_path, output_name+'.clean')}"
 
+        # execute PLink command
         shell_do(plink_cmd, log=True)
 
         missing_file = os.path.join(result_path, output_name+'.clean.missing')
@@ -152,6 +167,7 @@ class VariantQC:
                             # Write the second field to the output file
                             outfile.write(fields[1] + '\n')
 
+        # report
         process_complete = True
 
         outfiles_dict = {
@@ -169,7 +185,13 @@ class VariantQC:
     def remove_markers(self)->dict:
 
         """
-        Function to remove markers failing quality control
+        Function to remove markers failing quality control.
+
+        Returns:
+        - dict: A structured dictionary containing:
+            * 'pass': Boolean indicating the successful completion of the process.
+            * 'step': The label for this procedure ('ld_prune').
+            * 'output': Dictionary containing paths to the generated output files.
         """
 
         result_path      = self.results_dir
@@ -201,10 +223,13 @@ class VariantQC:
         with open(output_file, 'w') as file:
             file.writelines(lines)
 
+        #
         plink_cmd = f"--bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --exclude {os.path.join(result_path, output_name+'.clean-fail-markers-qc.txt')} --maf {maf} --mind {mind} --hwe {hwe} --geno {geno} --make-bed --out {os.path.join(result_path, output_name+'.clean.final')}"
 
+        # execute PLink command
         shell_do(plink_cmd, log=True)
 
+        # report
         process_complete = True
 
         outfiles_dict = {
