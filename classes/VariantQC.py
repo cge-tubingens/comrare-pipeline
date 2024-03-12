@@ -59,7 +59,7 @@ class VariantQC:
         Returns:
         - dict: A structured dictionary containing:
             * 'pass': Boolean indicating the successful completion of the process.
-            * 'step': The label for this procedure ('ld_prune').
+            * 'step': The label for this procedure.
             * 'output': Dictionary containing paths to the generated output files.
         """
 
@@ -133,7 +133,7 @@ class VariantQC:
         Returns:
         - dict: A structured dictionary containing:
             * 'pass': Boolean indicating the successful completion of the process.
-            * 'step': The label for this procedure ('ld_prune').
+            * 'step': The label for this procedure.
             * 'output': Dictionary containing paths to the generated output files.
         """
 
@@ -190,7 +190,7 @@ class VariantQC:
         Returns:
         - dict: A structured dictionary containing:
             * 'pass': Boolean indicating the successful completion of the process.
-            * 'step': The label for this procedure ('ld_prune').
+            * 'step': The label for this procedure.
             * 'output': Dictionary containing paths to the generated output files.
         """
 
