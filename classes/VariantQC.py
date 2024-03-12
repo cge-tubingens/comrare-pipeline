@@ -10,7 +10,6 @@ import pandas as pd
 
 from classes.Helpers import shell_do
 
-
 class VariantQC:
 
     def __init__(self, input_path:str, input_name:str, output_path:str, output_name:str, config_path:str, dependables_path:str) -> None:
@@ -67,10 +66,13 @@ class VariantQC:
 
         step = 'high_rate_missing_data' 
 
+        #
         plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
 
+        #
         plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --akeep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
 
+        # execute PLink commands
         cmds = [plink_cmd1, plink_cmd2]
         for cmd in cmds:
             shell_do(cmd, log=True)
