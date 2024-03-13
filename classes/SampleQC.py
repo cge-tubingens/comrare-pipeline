@@ -46,6 +46,7 @@ class SampleQC:
         self.input_name = input_name
         self.output_name= output_name
         self.dependables = dependables_path
+        self.fst_pruned_dir = None
 
         # open config file
         with open(config_path, 'r') as file:
@@ -55,6 +56,11 @@ class SampleQC:
         self.results_dir = os.path.join(output_path, 'sample_qc_results')
         if not os.path.exists(self.results_dir):
             os.mkdir(self.results_dir)
+
+        # create fails folder
+        self.fails_dir = os.path.join(self.results_dir, 'fail_samples')
+        if not os.path.exists(self.fails_dir):
+            os.mkdir(self.fails_dir)
         
         # create figures folder
         self.plots_dir = os.path.join(output_path, 'plots')
@@ -88,7 +94,7 @@ class SampleQC:
         geno= self.config_dict['geno']
         mind= self.config_dict['mind']
         hwe = self.config_dict['hwe']
-
+        ind_pair = self.config_dict['indep-pairwise']
 
         # Check type of maf
         if not isinstance(maf, float):
@@ -129,11 +135,17 @@ class SampleQC:
 
         step = "ld_prune"
 
+        # create figures folder
+        self.fst_pruned_dir = os.path.join(output_path, '1st_pruned')
+        if not os.path.exists(self.fst_pruned_dir):
+            os.mkdir(self.fst_pruned_dir)
+        fst_pruned_dir= self.fst_pruned_dir
+
         # generates prune.in and prune.out
-        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {high_ld_regions_file} --range --indep-pairwise 50 5 0.2 --out {os.path.join(result_path, output_name+'_1')}"
+        plink_cmd1 = f"plink --bfile {os.path.join(input_path, input_name)} --maf {maf} --geno {geno} --mind {mind} --hwe {hwe} --exclude {high_ld_regions_file} --range --indep-pairwise {ind_pair[0]} {ind_pair[1]} {ind_pair[2]} --out {os.path.join(fst_pruned_dir, output_name)}"
 
         # prune and creates a filtered binary file
-        plink_cmd2 = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --extract {os.path.join(result_path, output_name+'_1.prune.in')} --make-bed --out {os.path.join(output_path, output_name+'_1')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(input_path, input_name)} --keep-allele-order --extract {os.path.join(fst_pruned_dir, output_name+'.prune.in')} --make-bed --out {os.path.join(fst_pruned_dir, output_name)}"
 
         # execute Plink commands
         cmds = [plink_cmd1, plink_cmd2]
@@ -144,7 +156,7 @@ class SampleQC:
         process_complete = True
 
         outfiles_dict = {
-            'plink_out': output_path
+            'plink_out': fst_pruned_dir
         }
 
         out_dict = {
@@ -167,73 +179,38 @@ class SampleQC:
             * 'output': Dictionary containing paths to the generated output files.
         """
 
-        output_path= self.output_path
         output_name= self.output_name
         result_path= self.results_dir
         plots_path = self.plots_dir
+        fst_pruned_dir= self.fst_pruned_dir
+        fails_dir= self.fails_dir
 
         step = "heterozygosity_rate"
 
         # 
-        plink_cmd1 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --missing --out {os.path.join(result_path, output_name)}"
+        plink_cmd1 = f"plink --bfile {os.path.join(fst_pruned_dir, output_name)} --keep-allele-order --missing --out {os.path.join(result_path, output_name+'_1')}"
 
         # 
-        plink_cmd2 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --het --autosome --extract {os.path.join(result_path, output_name+'_1.prune.in')} --out {os.path.join(result_path, output_name)}"
+        plink_cmd2 = f"plink --bfile {os.path.join(fst_pruned_dir, output_name)} --keep-allele-order --het --autosome --extract {os.path.join(fst_pruned_dir, output_name+'.prune.in')} --out {os.path.join(result_path, output_name+'_1')}"
 
         # execute PLink commands
         cmds = [plink_cmd1, plink_cmd2]
         for cmd in cmds:
             shell_do(cmd, log=True)
 
-        # load .het and .imiss files
-        df_het = pd.read_csv(
-            os.path.join(result_path, output_name+'.het'),
-            sep="\s+"
+        fails_path = os.path.join(fails_dir, output_name+'.fail-imisshet-qc.txt')
+        logFMISS, meanHET = self.fail_imiss_het(
+            result_path, output_name+'_1',
+            fails_path
         )
-        df_imiss = pd.read_csv(
-            os.path.join(result_path, output_name+'.imiss'),
-            sep="\s+"
-        )
-
-        # compute Het mean
-        df_het['meanHet'] = (df_het['N(NM)']-df_het['O(HOM)'])/df_het['N(NM)']
-
-        df_imiss['logF_MISS'] = np.log10(df_imiss['F_MISS'])
-    
-        # compute the lower 2 standard deviation bound
-        meanHet_lower = df_het['meanHet'].mean() - 2*df_het['meanHet'].std()
-
-        # compute the upper 2 standard deviation bound
-        meanHet_upper = df_het['meanHet'].mean() + 2*df_het['meanHet'].std()
 
         # generate plot
         self.plot_imiss_het(
-            df_imiss['logF_MISS'], df_het['meanHet'],
-            meanHet_lower, meanHet_upper, plots_path
+            logFMISS, meanHET, plots_path
         )
-
-        # filter samples
-        mask = ((df_imiss['F_MISS']>=0.04) | (df_het['meanHet'] < meanHet_lower) | (df_het['meanHet'] > meanHet_upper))
-
-        df = df_imiss[mask].reset_index(drop=True)
-        df = df.iloc[:,0:2].copy()
-
-        del df_het
-        del df_imiss
-
-        # save samples that failed imiss-het QC
-        path_df = os.path.join(result_path, output_name+'.fail-imisshet-qc.txt')
-        df.to_csv(
-            path_or_buf =path_df, 
-            sep         ='\t', 
-            index       =False, 
-            header      =False
-        )
-
-        del df
 
         # create cleaned binary file
-        plink_cmd3 = f"plink --bfile {os.path.join(output_path, output_name+'_1')} --keep-allele-order --remove {path_df} --make-bed --out {os.path.join(result_path, output_name+'_2')}"
+        plink_cmd3 = f"plink --bfile {os.path.join(fst_pruned_dir, output_name)} --keep-allele-order --remove {fails_path} --make-bed --out {os.path.join(result_path, output_name+'_1')}"
 
         # execute PLink command
         shell_do(plink_cmd3, log=True)
@@ -625,13 +602,16 @@ class SampleQC:
         return None
 
     @staticmethod
-    def plot_imiss_het(logFMISS, meanHET, meanHet_low, meanHet_up, figs_folder):
+    def plot_imiss_het(logFMISS, meanHET, figs_folder):
 
         # Calculate colors based on density
         norm = Normalize(vmin=min(logFMISS), vmax=max(logFMISS))
         colors = colormaps['viridis']
 
         fig_path = os.path.join(figs_folder, "imiss-vs-het.pdf")
+
+        meanHet_low= np.mean(meanHET) - 2*np.std(meanHET)
+        meanHet_up = np.mean(meanHET) + 2*np.std(meanHET)
 
         # Plotting
         plt.figure(figsize=(8, 6))
@@ -649,3 +629,43 @@ class SampleQC:
         plt.savefig(fig_path)
 
         return None
+
+    @staticmethod
+    def fail_imiss_het(folder_path:str, file_name:str, output_file:str):
+
+        # load .het and .imiss files
+        df_het = pd.read_csv(
+            os.path.join(folder_path, file_name+'.het'),
+            sep="\s+"
+        )
+        df_imiss = pd.read_csv(
+            os.path.join(folder_path, file_name+'.imiss'),
+            sep="\s+"
+        )
+
+        # compute Het mean
+        df_het['meanHet'] = (df_het['N(NM)']-df_het['O(HOM)'])/df_het['N(NM)']
+
+        df_imiss['logF_MISS'] = np.log10(df_imiss['F_MISS'])
+    
+        # compute the lower 2 standard deviation bound
+        meanHet_lower = df_het['meanHet'].mean() - 2*df_het['meanHet'].std()
+
+        # compute the upper 2 standard deviation bound
+        meanHet_upper = df_het['meanHet'].mean() + 2*df_het['meanHet'].std()
+
+        # filter samples
+        mask = ((df_imiss['F_MISS']>=0.04) | (df_het['meanHet'] < meanHet_lower) | (df_het['meanHet'] > meanHet_upper))
+
+        df = df_imiss[mask].reset_index(drop=True)
+        df = df.iloc[:,0:2].copy()
+
+        # save samples that failed imiss-het QC
+        df.to_csv(
+            path_or_buf =output_file, 
+            sep         ='\t', 
+            index       =False, 
+            header      =False
+        )
+
+        return df_imiss['logF_MISS'], df_het['meanHet']
