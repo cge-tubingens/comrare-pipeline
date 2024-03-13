@@ -69,6 +69,11 @@ class VariantQC:
         chr = self.config_dict['chr']
 
         # check type for chr
+        if not isinstance(chr, int):
+            raise TypeError("chr should be of type integer.")
+        
+        if chr < 0 or chr > 26:
+            raise ValueError("chr should be between 1 and 26") 
 
         step = 'high_rate_missing_data' 
 
@@ -76,7 +81,7 @@ class VariantQC:
         plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
 
         #
-        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --akeep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
 
         # execute PLink commands
         cmds = [plink_cmd1, plink_cmd2]
