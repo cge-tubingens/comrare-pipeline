@@ -6,6 +6,10 @@ import os
 import json
 
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+from matplotlib import colormaps
 
 from classes.Helpers import shell_do
 
@@ -51,6 +55,11 @@ class SampleQC:
         self.results_dir = os.path.join(output_path, 'sample_qc_results')
         if not os.path.exists(self.results_dir):
             os.mkdir(self.results_dir)
+        
+        # create figures folder
+        self.plots_dir = os.path.join(output_path, 'plots')
+        if not os.path.exists(self.plots_dir):
+            os.mkdir(self.plots_dir)
 
     def run_ld_prune(self, ld_region_file:str)->dict:
 
@@ -161,6 +170,7 @@ class SampleQC:
         output_path= self.output_path
         output_name= self.output_name
         result_path= self.results_dir
+        plots_path = self.plots_dir
 
         step = "heterozygosity_rate"
 
@@ -187,12 +197,20 @@ class SampleQC:
 
         # compute Het mean
         df_het['meanHet'] = (df_het['N(NM)']-df_het['O(HOM)'])/df_het['N(NM)']
+
+        df_imiss['logF_MISS'] = np.log10(df_imiss['F_MISS'])
     
         # compute the lower 2 standard deviation bound
         meanHet_lower = df_het['meanHet'].mean() - 2*df_het['meanHet'].std()
 
         # compute the upper 2 standard deviation bound
         meanHet_upper = df_het['meanHet'].mean() + 2*df_het['meanHet'].std()
+
+        # generate plot
+        self.plot_imiss_het(
+            df_imiss['logF_MISS'], df_het['meanHet'],
+            meanHet_lower, meanHet_upper, plots_path
+        )
 
         # filter samples
         mask = ((df_imiss['F_MISS']>=0.04) | (df_het['meanHet'] < meanHet_lower) | (df_het['meanHet'] > meanHet_upper))
@@ -603,5 +621,31 @@ class SampleQC:
     
 
     def run_pca_analysis(self)->dict:
+
+        return None
+
+    @staticmethod
+    def plot_imiss_het(logFMISS, meanHET, meanHet_low, meanHet_up, figs_folder):
+
+        # Calculate colors based on density
+        norm = Normalize(vmin=min(logFMISS), vmax=max(logFMISS))
+        colors = colormaps['viridis']
+
+        fig_path = os.path.join(figs_folder, "imiss-vs-het.pdf")
+
+        # Plotting
+        plt.figure(figsize=(8, 6))
+        plt.scatter(logFMISS, meanHET, cmap=colors, s=50, marker='o', norm=norm)
+        plt.xlim(-3, 0)
+        plt.ylim(0, 0.5)
+        plt.xlabel("Proportion of missing genotypes")
+        plt.ylabel("Heterozygosity rate")
+        plt.yticks(np.arange(0, 0.51, 0.05))
+        plt.xticks([-3, -2, -1, 0], [0.001, 0.01, 0.1, 1])
+        plt.axhline(meanHet_low, color='red', linestyle='--')
+        plt.axhline(meanHet_up, color='red', linestyle='--')
+        plt.axvline(-1.522879, color='red', linestyle='--')
+        plt.grid(True)
+        plt.savefig(fig_path)
 
         return None
