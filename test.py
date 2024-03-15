@@ -27,3 +27,5 @@ sample_QC.run_relatedness_prune()
 sample_QC.delete_failing_QC()
 
 sample_QC.divergent_ancestry_step_one(ld_region_file='high-LD-regions.txt')
+
+sample_QC.run_pca_analysis()
