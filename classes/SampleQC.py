@@ -85,7 +85,6 @@ class SampleQC:
 
         input_path       = self.input_path
         input_name       = self.input_name
-        result_path      = self.results_dir
         output_path      = self.output_path
         output_name      = self.output_name
         dependables_path = self.dependables
@@ -519,7 +518,7 @@ class SampleQC:
         ind_pair = self.config_dict['indep-pairwise']
         mind = self.config_dict['mind']
 
-        step = "identify_samples_divergent_ancestry_1"
+        step = "preparation_for_pca"
 
         # generate prune.in and prune.out files
         plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean')} --autosome   --exclude {os.path.join(dependables_path, ld_region_file)} --geno {geno} --hwe {hwe} --indep-pairwise {ind_pair[0]} {ind_pair[1]} {ind_pair[2]} --keep-allele-order --maf {maf} --mind {mind} --out {os.path.join(result_path, output_name+'.pre_ind_clean')} --range"
@@ -547,10 +546,58 @@ class SampleQC:
 
         return out_dict
     
-
     def run_pca_analysis(self)->dict:
 
-        return None
+        """
+        Funtion to prunes samples based on Linkage Disequilibrium
+
+        Parameters:
+        - ld_region_file: string
+            file name with regions with high Linkage Distribution
+
+        Returns:
+        - dict: A structured dictionary containing:
+            * 'pass': Boolean indicating the successful completion of the process.
+            * 'step': The label for this procedure ('ld_prune').
+            * 'output': Dictionary containing paths to the generated output files.
+        """
+
+        output_path = self.output_path
+        output_name = self.output_name
+        result_path = self.results_dir
+        fails_dir = self.fails_dir
+        threshold = self.config_dict['outlier_threshold']
+        pca = self.config_dict['pca']
+
+        step = "pca_analysis"
+
+        # runs pca analysis
+        plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean.pca_ready')}   --keep-allele-order --out {os.path.join(result_path, output_name+'.pca')} --pca {pca}"
+
+        # executes Plink command
+        shell_do(plink_cmd1, log=True)
+
+        ancestry_fails = self.fail_pca(result_path, output_name, fails_dir, threshold)
+
+        # create cleaned binary files
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean')} --allow-no-sex --remove {ancestry_fails} --make-bed --out {os.path.join(result_path, output_name+'.clean')}"
+
+        shell_do(plink_cmd2, log=True)
+
+        # report
+        process_complete = True
+
+        outfiles_dict = {
+            'plink_out': result_path
+        }
+
+        out_dict = {
+            'pass': process_complete,
+            'step': step,
+            'output': outfiles_dict
+        }
+
+        return out_dict
 
     @staticmethod
     def plot_imiss_het(logFMISS, meanHET, figs_folder):
@@ -620,3 +667,34 @@ class SampleQC:
         )
 
         return df_imiss['logF_MISS'], df_het['meanHet']
+
+    @staticmethod
+    def fail_pca(folder_path:str, file_name:str, output_folder:str, threshold:int):
+
+        # load .eigenvec file
+        df_eigenvec = pd.read_csv(
+            os.path.join(folder_path, file_name+'.pca.eigenvec'),
+            header=None,
+            sep='\s+'
+        )
+        eigenvecs_mat = df_eigenvec[df_eigenvec.columns[2:]].copy()
+
+        means = eigenvecs_mat.mean()
+        std   = eigenvecs_mat.std()
+
+        for k in eigenvecs_mat.columns:
+            eigenvecs_mat[k] = (np.abs(eigenvecs_mat[k] -means[k]) > threshold*std[k] )
+
+        df_outs = df_eigenvec[df_eigenvec.columns[:2]].copy()
+        df_outs['is_outlier'] = (np.sum(eigenvecs_mat, axis=1) >0)
+
+        df_outs = df_outs[df_outs['is_outlier']].reset_index(drop=True).drop(columns='is_outlier')
+
+        df_outs.to_csv(
+            os.path.join(output_folder, file_name+'.fail-ancestry-qc.txt'),
+            header=None,
+            index=False,
+            sep=' '
+        )
+
+        return os.path.join(output_folder, file_name+'.fail-ancestry-qc.txt')
