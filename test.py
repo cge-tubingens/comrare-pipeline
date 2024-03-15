@@ -26,7 +26,4 @@ sample_QC.run_relatedness_prune()
 
 sample_QC.delete_failing_QC()
 
-sample_QC.divergent_ancestry_step_one(
-    hapmap3r2_no_at_cg_snps_file='hapmap3r2_CEU.CHB.JPT.YRI.no-at-cg-snps.txt', 
-    hapmap3r2_founders_name='hapmap3r2_CEU.CHB.JPT.YRI.founders.no-at-cg-snps'
-)
+sample_QC.divergent_ancestry_step_one(ld_region_file='high-LD-regions.txt')
