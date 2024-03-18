@@ -43,6 +43,7 @@ class VariantQC:
         self.input_name = input_name
         self.output_name= output_name
         self.dependables = dependables_path
+        self.clean_sample_folder = os.path.join(self.output_path, 'clean_samples')
 
         with open(config_path, 'r') as file:
             self.config_dict = json.load(file)
@@ -77,6 +78,7 @@ class VariantQC:
         result_path = self.results_dir
         output_name = self.output_name
         fails_dir   = self.fails_dir
+        cleaned_samples = self.clean_sample_folder
 
         chr = self.config_dict['chr']
 
@@ -86,18 +88,14 @@ class VariantQC:
         
         if chr < 0 or chr > 26:
             raise ValueError("chr should be between 1 and 26")
-        
-        clean_samples_folder = os.path.join(self.output_path, 'clean_samples')
-        if not os.path.exists(clean_samples_folder):
-            raise FileNotFoundError("There is no folder with clean sample data. Run sample quality control.")
 
         step = 'high_rate_missing_data'
 
         #
-        plink_cmd1 = f"plink --bfile {os.path.join(clean_samples_folder, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
+        plink_cmd1 = f"plink --bfile {os.path.join(cleaned_samples, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
 
         #
-        plink_cmd2 = f"plink --bfile {os.path.join(clean_samples_folder, output_name+'.clean')} --keep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(cleaned_samples, output_name+'.clean')} --keep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
 
         # execute PLink commands
         cmds = [plink_cmd1, plink_cmd2]
@@ -167,33 +165,29 @@ class VariantQC:
 
         result_path = self.results_dir
         output_name = self.output_name
+        fails_dir   = self.fails_dir
+        cleaned_samples = self.clean_sample_folder
 
         step = 'different_genotype_case_control'
 
         # 
-        plink_cmd = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --test-missing --out {os.path.join(result_path, output_name+'.clean')}"
+        plink_cmd = f"plink --bfile {os.path.join(cleaned_samples, output_name+'.clean')} --keep-allele-order --test-missing --out {os.path.join(result_path, output_name+'.clean_1')}"
 
         # execute PLink command
         shell_do(plink_cmd, log=True)
 
-        missing_file = os.path.join(result_path, output_name+'.clean.missing')
+        df_missing = pd.read_csv(
+            os.path.join(result_path, output_name+'.clean.missing'),
+            sep='\s+'
+        )
 
-        # Open the input file for reading
-        with open(missing_file, 'r') as infile:
-            # Open the output file for writing
-            with open(missing_file + ".clean-fail-diffmiss-qc.txt", 'w') as outfile:
-                # Iterate over each line in the input file
-                for line in infile:
-                    # Remove leading whitespace from the line
-                    line = line.strip()
-                    # Split the line into fields based on whitespace
-                    fields = line.split()
-                    # Check if the first field is not 'CHR'
-                    if fields[0] != 'CHR':
-                        # Check if the fifth field is less than 0.00001
-                        if float(fields[4]) < 0.00001:
-                            # Write the second field to the output file
-                            outfile.write(fields[1] + '\n')
+        df_missing = df_missing[df_missing['P']< 0.00001].reset_index(drop=True)
+        df_missing = df_missing[['SNP']].copy()
+        df_missing.to_csv(
+            os.path.join(fails_dir, output_name+'.clean-fail-diffmiss-qc.txt'),
+            header=False,
+            index=False
+        )
 
         # report
         process_complete = True
