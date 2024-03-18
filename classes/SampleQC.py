@@ -549,7 +549,7 @@ class SampleQC:
     def run_pca_analysis(self)->dict:
 
         """
-        Funtion to prunes samples based on Linkage Disequilibrium
+        Funtion to prunes samples .....
 
         Parameters:
         - ld_region_file: string
@@ -562,7 +562,6 @@ class SampleQC:
             * 'output': Dictionary containing paths to the generated output files.
         """
 
-        output_path = self.output_path
         output_name = self.output_name
         result_path = self.results_dir
         fails_dir = self.fails_dir
@@ -570,6 +569,10 @@ class SampleQC:
         pca = self.config_dict['pca']
 
         step = "pca_analysis"
+
+        # check `pca` type
+        if not isinstance(pca, int):
+            raise TypeError("pca should be an integer value")
 
         # runs pca analysis
         plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean.pca_ready')}   --keep-allele-order --out {os.path.join(result_path, output_name+'.pca')} --pca {pca}"
