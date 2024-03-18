@@ -33,7 +33,7 @@ class SampleQC:
         if not os.path.exists(input_path) or not os.path.exists(output_path):
             raise FileNotFoundError("input_path or output_path is not a valid path")
         if not os.path.exists(dependables_path):
-            raise FileNotFoundError("dependables_oath is not a valid path")
+            raise FileNotFoundError("dependables_path is not a valid path")
         if not bed_check:
             raise FileNotFoundError(".bed file not found")
         if not fam_check:

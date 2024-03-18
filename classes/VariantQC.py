@@ -4,9 +4,10 @@ Python module to perform variant quality control
 
 import os
 import json
-import shutil
 
+import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 from classes.Helpers import shell_do
 
@@ -30,7 +31,7 @@ class VariantQC:
         if not os.path.exists(input_path) or not os.path.exists(output_path):
             raise FileNotFoundError("input_path or output_path is not a valid path")
         if not os.path.exists(dependables_path):
-            raise FileNotFoundError("dependables_oath is not a valid path")
+            raise FileNotFoundError("dependables_path is not a valid path")
         if not bed_check:
             raise FileNotFoundError(".bed file not found")
         if not fam_check:
@@ -79,6 +80,7 @@ class VariantQC:
         output_name = self.output_name
         fails_dir   = self.fails_dir
         cleaned_samples = self.clean_sample_folder
+        fig_folder = self.plots_dir
 
         chr = self.config_dict['chr']
 
@@ -106,6 +108,8 @@ class VariantQC:
             os.path.join(result_path, output_name+'.clean_m_only.lmiss'),
             sep="\s+"
         )
+        self.make_histogram(df_males['F_MISS'], fig_folder, 'missing_data_male.pdf')
+
         df_males = df_males[df_males['F_MISS']>0.2].reset_index(drop=True)
         df_males = df_males[['SNP']].copy()
         df_males.to_csv(
@@ -119,6 +123,8 @@ class VariantQC:
             os.path.join(result_path, output_name+'.clean_not_y.lmiss'),
             sep="\s+"
         )
+        self.make_histogram(df_females['F_MISS'], fig_folder, 'missing_data_female.pdf')
+
         df_females = df_females[df_females['F_MISS']>0.2].reset_index(drop=True)
         df_females = df_females[['SNP']].copy()
         df_females.to_csv(
@@ -279,3 +285,42 @@ class VariantQC:
         }
 
         return out_dict
+
+    @staticmethod
+    def make_histogram(F_MISS, figs_folder, output_name):
+
+        values = F_MISS.copy()
+
+        for k in range(len(F_MISS)):
+            if values[k] == 0:
+                values[k] = np.finfo(np.float32).eps
+
+        Y = np.log10(values)
+
+        fig_path = os.path.join(figs_folder, f"{output_name}.pdf")
+
+        plt.hist(Y, bins=50, color='red')
+        plt.xlabel('Fraction of missing data')
+        plt.ylabel('Number of SNPs')
+        plt.title('All SNPs')
+        plt.xlim(-4, 0)
+        plt.ylim(0, 100000)
+
+        # Label y-axis with the 'ylabels' values
+        plt.yticks([])
+        ylabels = ['0', '20000', '40000', '60000', '80000', '100000']
+        plt.gca().set_yticks([int(label) for label in ylabels])
+        plt.gca().set_yticklabels(ylabels)
+
+        # Label x-axis with the 'xlabels' values
+        plt.xticks([])
+        xlabels = ['-4', '-3', '-2', '-1', '0']
+        plt.gca().set_xticks([-4, -3, -2, -1, 0])
+        plt.gca().set_xticklabels(xlabels)
+
+        # Draw the vertical line indicating the cut off threshold
+        plt.axvline(x=np.log10(0.2), linestyle='--', color='black')
+
+        plt.savefig(fig_path)
+
+        return None
