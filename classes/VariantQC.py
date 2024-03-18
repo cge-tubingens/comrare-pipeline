@@ -74,8 +74,9 @@ class VariantQC:
             * 'output': Dictionary containing paths to the generated output files.
         """
 
-        result_path      = self.results_dir
-        output_name      = self.output_name
+        result_path = self.results_dir
+        output_name = self.output_name
+        fails_dir   = self.fails_dir
 
         chr = self.config_dict['chr']
 
@@ -84,15 +85,19 @@ class VariantQC:
             raise TypeError("chr should be of type integer.")
         
         if chr < 0 or chr > 26:
-            raise ValueError("chr should be between 1 and 26") 
+            raise ValueError("chr should be between 1 and 26")
+        
+        clean_samples_folder = os.path.join(self.output_path, 'clean_samples')
+        if not os.path.exists(clean_samples_folder):
+            raise FileNotFoundError("There is no folder with clean sample data. Run sample quality control.")
 
-        step = 'high_rate_missing_data' 
+        step = 'high_rate_missing_data'
 
         #
-        plink_cmd1 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
+        plink_cmd1 = f"plink --bfile {os.path.join(clean_samples_folder, output_name+'.clean')} --keep-allele-order --missing --filter-males --chr {chr} --out {os.path.join(result_path, output_name+'.clean_m_only')}"
 
         #
-        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(clean_samples_folder, output_name+'.clean')} --keep-allele-order --missing --not-chr {chr} --out {os.path.join(result_path, output_name+'.clean_not_y')}"
 
         # execute PLink commands
         cmds = [plink_cmd1, plink_cmd2]
@@ -104,27 +109,34 @@ class VariantQC:
             sep="\s+"
         )
         df_males = df_males[df_males['F_MISS']>0.2].reset_index(drop=True)
-        males_snp = df_males['SNP'].to_list()
-
-        with open(os.path.join(result_path, output_name+'.clean_m_only-fail-lmiss-qc.txt'), 'rw') as file:
-            for snp in males_snp:
-                file.write('%s\n' % snp)
+        df_males = df_males[['SNP']].copy()
+        df_males.to_csv(
+            os.path.join(fails_dir, output_name+'.clean_m_only-fail-lmiss-qc.txt'),
+            sep=' ',
+            header=False,
+            index=False
+        )
 
         df_females = pd.read_csv(
             os.path.join(result_path, output_name+'.clean_not_y.lmiss'),
             sep="\s+"
         )
         df_females = df_females[df_females['F_MISS']>0.2].reset_index(drop=True)
-        females_snp = df_females['SNP'].to_list()
+        df_females = df_females[['SNP']].copy()
+        df_females.to_csv(
+            os.path.join(fails_dir, output_name+'.clean_not_y-fail-lmiss-qc.txt'),
+            sep=' ',
+            header=False,
+            index=False
+        )
 
-        with open(os.path.join(result_path, output_name+'.clean_not_y-fail-lmiss-qc.txt'), 'rw') as file:
-            for snp in females_snp:
-                file.write('%s\n' % snp)
-
-        fail_snp = males_snp + females_snp
-        with open(os.path.join(result_path, output_name+'.clean-fail-lmiss-qc.txt'), 'rw'):
-            for snp in fail_snp:
-                file.write('%s\n' % snp)
+        df_fails = pd.concat([df_females, df_males], axis=0)
+        df_fails.to_csv(
+            os.path.join(fails_dir, output_name+'.clean-fail-lmiss-qc.txt'),
+            sep=' ',
+            header=False,
+            index=False
+        )
 
         # report
         process_complete = True
