@@ -41,11 +41,11 @@ class SampleQC:
         if not bim_check:
             raise FileNotFoundError(".bim file not found")
 
-        self.input_path = input_path
-        self.output_path= output_path
-        self.input_name = input_name
-        self.output_name= output_name
-        self.dependables = dependables_path
+        self.input_path     = input_path
+        self.output_path    = output_path
+        self.input_name     = input_name
+        self.output_name    = output_name
+        self.dependables    = dependables_path
         self.fst_pruned_dir = None
 
         # open config file
@@ -564,9 +564,9 @@ class SampleQC:
 
         output_name = self.output_name
         result_path = self.results_dir
-        fails_dir = self.fails_dir
-        threshold = self.config_dict['outlier_threshold']
-        pca = self.config_dict['pca']
+        fails_dir   = self.fails_dir
+        threshold   = self.config_dict['outlier_threshold']
+        pca         = self.config_dict['pca']
 
         step = "pca_analysis"
 
