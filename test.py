@@ -1,12 +1,18 @@
 from classes.SampleQC import SampleQC
 from classes.VariantQC import VariantQC
 
-INPUT_PATH = '/mnt/0A2AAC152AABFBB7/PipeLine/data/inputData'
+# Directory path
+INPUT_PATH = '/home/tenghe/ikeab/projects/comrare-pipeline/data' 
+# Data file name
 INPUT_NAME = 'test_1'
-OUTPUT_PATH= '/mnt/0A2AAC152AABFBB7/PipeLine/data/outputData'
-OUTPUT_NAME= 'results'
-CONFIG_PATH= '/mnt/0A2AAC152AABFBB7/comrare-pipeline/config.JSON'
-DEPEND_PATH= '/mnt/0A2AAC152AABFBB7/PipeLine/data/auxiliarData'
+# Output dir
+OUTPUT_PATH= '/home/tenghe/ikeab/projects/comrare-pipeline/results/test-out'
+# Output file name
+OUTPUT_NAME= 'qc_out'
+# Config file
+CONFIG_PATH= '/home/tenghe/ikeab/projects/comrare-pipeline/config.JSON'
+# Path to LD regions and reference genome
+DEPEND_PATH= 'home/tenghe/ikeab/projects/comrare-pipeline/data/dependables'
 
 sample_QC = SampleQC(
     input_path=INPUT_PATH,
@@ -29,7 +35,8 @@ sample_QC.delete_failing_QC()
 
 sample_QC.divergent_ancestry_step_one(ld_region_file='high-LD-regions.txt')
 
-sample_QC.run_pca_analysis()
+sample_QC.run_pca_analysis() 
+
 
 variant_QC = VariantQC(
     input_path=INPUT_PATH,
