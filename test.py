@@ -1,4 +1,5 @@
 from classes.SampleQC import SampleQC
+from classes.VariantQC import VariantQC
 
 INPUT_PATH = '/mnt/0A2AAC152AABFBB7/PipeLine/data/inputData'
 INPUT_NAME = 'test_1'
@@ -29,3 +30,12 @@ sample_QC.delete_failing_QC()
 sample_QC.divergent_ancestry_step_one(ld_region_file='high-LD-regions.txt')
 
 sample_QC.run_pca_analysis()
+
+variant_QC = VariantQC(
+    input_path=INPUT_PATH,
+    input_name=INPUT_NAME,
+    output_path=OUTPUT_PATH,
+    output_name=OUTPUT_NAME,
+    config_path=CONFIG_PATH,
+    dependables_path=DEPEND_PATH
+)
