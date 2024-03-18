@@ -582,8 +582,13 @@ class SampleQC:
 
         ancestry_fails = self.fail_pca(result_path, output_name, fails_dir, threshold)
 
+        # create folder for cleaned files
+        self.clean_samples_dir = os.path.join(self.output_path, 'clean_samples')
+        if not os.path.exists(self.clean_samples_dir):
+            os.mkdir(self.clean_samples_dir)
+
         # create cleaned binary files
-        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean')} --allow-no-sex --remove {ancestry_fails} --make-bed --out {os.path.join(result_path, output_name+'.clean')}"
+        plink_cmd2 = f"plink --bfile {os.path.join(result_path, output_name+'.pre_ind_clean')} --allow-no-sex --remove {ancestry_fails} --make-bed --out {os.path.join(self.clean_samples_dir, output_name+'.clean')}"
 
         shell_do(plink_cmd2, log=True)
 
