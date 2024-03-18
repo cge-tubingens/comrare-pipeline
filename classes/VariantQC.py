@@ -177,7 +177,7 @@ class VariantQC:
         shell_do(plink_cmd, log=True)
 
         df_missing = pd.read_csv(
-            os.path.join(result_path, output_name+'.clean.missing'),
+            os.path.join(result_path, output_name+'.clean_1.missing'),
             sep='\s+'
         )
 
@@ -218,6 +218,8 @@ class VariantQC:
 
         result_path      = self.results_dir
         output_name      = self.output_name
+        fails_dir   = self.fails_dir
+        cleaned_samples = self.clean_sample_folder
 
         maf = self.config_dict['maf']
         geno= self.config_dict['geno']
@@ -226,27 +228,39 @@ class VariantQC:
 
         step = "remove_markers"
 
-        fail_lmiss = os.path.join(result_path, output_name+'.clean-fail-lmiss-qc.txt')
-        fail_diffmiss = os.path.join(result_path, output_name+'.clean-fail-diffmiss-qc.txt')
+        lmiss_path = os.path.join(fails_dir, output_name+'.clean-fail-lmiss-qc.txt')
+        if os.path.getsize(lmiss_path)==0:
+            df_lmiss = pd.DataFrame()
+        else:
+            df_lmiss = pd.read_csv(
+                lmiss_path,
+                header=None,
+                index_col=False
+            )
+        
+        df_diffmiss = pd.read_csv(
+            os.path.join(fails_dir, output_name+'.clean-fail-diffmiss-qc.txt'),
+            header=None,
+            index_col=False
+        )
+        df_markers = pd.concat([df_lmiss, df_diffmiss], axis=0)
+        df_markers = df_markers\
+            .drop_duplicates(keep='first')\
+            .sort_values(by=df_markers.columns[0], inplace=False)
 
-        output_file = os.path.join(result_path, output_name+'.clean-fail-markers-qc.txt')
+        df_markers.to_csv(
+            os.path.join(result_path, output_name+'.clean-fail-markers-qc.txt'),
+            header=False,
+            index=False
+        )
 
-        # Concatenate files
-        with open(output_file, 'wb') as outfile:
-            for file_path in [fail_lmiss, fail_diffmiss]:
-                with open(file_path, 'rb') as infile:
-                    shutil.copyfileobj(infile, outfile)
-
-        # Sort and remove duplicates
-        with open(output_file, 'r') as file:
-            lines = sorted(set(file.readlines()))
-
-        # Write sorted and unique content back to the output file
-        with open(output_file, 'w') as file:
-            file.writelines(lines)
+        # create folder for cleaned files
+        self.clean_variant_dir = os.path.join(self.output_path, 'clean_variants')
+        if not os.path.exists(self.clean_variant_dir):
+            os.mkdir(self.clean_variant_dir)
 
         #
-        plink_cmd = f"--bfile {os.path.join(result_path, output_name+'.clean')} --keep-allele-order --exclude {os.path.join(result_path, output_name+'.clean-fail-markers-qc.txt')} --maf {maf} --mind {mind} --hwe {hwe} --geno {geno} --make-bed --out {os.path.join(result_path, output_name+'.clean.final')}"
+        plink_cmd = f"plink --bfile {os.path.join(cleaned_samples, output_name+'.clean')} --keep-allele-order --exclude {os.path.join(result_path, output_name+'.clean-fail-markers-qc.txt')} --maf {maf} --mind {mind} --hwe {hwe} --geno {geno} --make-bed --out {os.path.join(self.clean_variant_dir, output_name+'.clean.final')}"
 
         # execute PLink command
         shell_do(plink_cmd, log=True)
