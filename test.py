@@ -39,3 +39,9 @@ variant_QC = VariantQC(
     config_path=CONFIG_PATH,
     dependables_path=DEPEND_PATH
 )
+
+variant_QC.missing_data_rate()
+
+variant_QC.different_genotype_call_rate()
+
+variant_QC.remove_markers()
